@@ -1,6 +1,6 @@
 import re
 from dotenv import load_dotenv
-from llm_client import HelloAgentsLLM
+from llm_client import NexusAgentsLLM
 from tools import ToolExecutor, search
 
 # ReAct prompt template
@@ -33,7 +33,7 @@ History: {history}
 """
 
 class ReActAgent:
-    def __init__(self, llm_client: HelloAgentsLLM, tool_executor: ToolExecutor, max_steps: int = 3) -> None:
+    def __init__(self, llm_client: NexusAgentsLLM, tool_executor: ToolExecutor, max_steps: int = 3) -> None:
         self.llm_client = llm_client
         self.tool_executor = tool_executor
         self.max_steps = max_steps
@@ -135,7 +135,7 @@ class ReActAgent:
 # --- Test ---
 if __name__ == "__main__":
     load_dotenv()
-    client = HelloAgentsLLM()
+    client = NexusAgentsLLM()
     executor = ToolExecutor()
 
     # Register searching tool `search()`

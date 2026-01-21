@@ -1,9 +1,8 @@
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
-from typing import List, Dict
 
-class HelloAgentsLLM:
+class NexusAgentsLLM:
     """
     Self-defined LLM client. 
     Capsulate OpenAI interface and use streaming response by default.
@@ -56,7 +55,7 @@ if __name__ == "__main__":
     load_dotenv()
     
     try:
-        llmClient = HelloAgentsLLM()
+        llmClient = NexusAgentsLLM()
 
         msg = [
             {"role": "system", "content": "You are a helpful assistant that writes Golang code."},
