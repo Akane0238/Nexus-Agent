@@ -1,6 +1,7 @@
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
+from rich.console import Console
 
 class NexusAgentsLLM:
     """
@@ -22,6 +23,7 @@ class NexusAgentsLLM:
         
         self.model = m
         self.client = OpenAI(api_key=key, base_url=url, timeout=timeout)
+        self.console = Console() # log for debug
     
     
     def think(self, message: list[dict[str, str]], temperature: float = 0) -> str | None :
@@ -29,23 +31,23 @@ class NexusAgentsLLM:
         Calling LLM to think and return the response.
         """
 
-        print(f"🧠 Calling {self.model} Model...")
+        self.console.print(f"🧠 [bold magenta]Calling {self.model} Model...[/bold magenta]")
         try:
             response = self.client.chat.completions.create(model=self.model, messages=message, temperature=temperature, stream=True,) #type: ignore
 
             # handle streaming response
-            print("✅ LLM successfully response:")
+            self.console.print("✅ [bold magenta]LLM successfully response[/bold magenta]:")
             collected_content = []
             for chunk in response:
                 content = chunk.choices[0].delta.content or ""
-                print(content, end="", flush=True)
+                self.console.out(content, end="", style="cyan")
                 collected_content.append(content)
-            print()
+            self.console.print()
             
             # return the complete response in string
             return "".join(collected_content)
         except Exception as e:
-            print(f"❌ Error when calling LLM API: {e}")
+            self.console.print(f"❌ [bold red]Error when calling LLM API[/red]: [red]{e}[/red]")
             return None
 
 

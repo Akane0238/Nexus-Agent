@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from PaSModules.planner import Planner
 from PaSModules.executor import Executor
 from llm_client import NexusAgentsLLM
+from rich import print
 
 
 class PlanAndSolveAgent:
@@ -11,17 +12,17 @@ class PlanAndSolveAgent:
         self.executor = Executor(llm_client)
 
     def run(self, question: str):
-        print(f"\n--- Start processing question ---\nquestion: {question}")
+        print(f"\n[bold green]--- Start processing question ---[/bold green]\n[yellow]question[/yellow]: {question}")
 
         plan = self.planner.plan(question)
 
         if not plan:
-            print("\n--- Task terminated ---\nCannot generate valid plan.")
+            print("\n[bold green]--- Task terminated ---[/bold green]\nCannot generate valid plan.")
             return
 
         answer = self.executor.execute(question, plan)
 
-        print(f"\n--- Task finished ---\nFinal answer: {answer}")
+        print(f"\n[bold green]--- Task finished ---[/bold green]\n[yellow]Final answer[/yellow]: {answer}")
 
 
 # --- Test ---

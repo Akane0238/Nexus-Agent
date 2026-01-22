@@ -2,6 +2,7 @@ import re
 from dotenv import load_dotenv
 from llm_client import NexusAgentsLLM
 from tools import ToolExecutor, search
+from rich import print
 
 # ReAct prompt template
 REACT_PROMPT_TEMPLATE = """
@@ -67,7 +68,7 @@ class ReActAgent:
         # Main loop
         while current_step < self.max_steps:
             current_step += 1
-            print(f"--- Step {current_step} ---")
+            print(f"[bold green]--- Step {current_step} ---[/bold green]")
 
             # 1. Formating prompt
             tools_desc = self.tool_executor.getAvailableTools()
@@ -85,7 +86,7 @@ class ReActAgent:
             response_txt = self.llm_client.think(message=messages)
 
             if not response_txt:
-                print("Error: LLM cannot return a valid reponse.")
+                print("[bold red]Error: LLM cannot return a valid reponse.[/bold red]")
                 break
             
             # 3. Parsing LLM output and taking action
@@ -95,14 +96,14 @@ class ReActAgent:
             #    print(f"thought: {thought}")
 
             if not action:
-                print("Warning: cannot parse valid Action, progress stop.")
+                print("[bold red]Warning: cannot parse valid Action, progress stop.[/bold red]")
                 break
 
             # 4. Executing action and Observing
             if action.startswith("Finish"):
                 answer = ans.group(1) if (ans := re.search(r"Finish\[(.*)\]", action)) else ""
 
-                print(f"🎉 Final answer: {answer}")
+                print(f"🎉 [bold green]Final answer[/bold green]: {answer}")
                 return answer
 
             # LLM wants to use tools
@@ -112,22 +113,22 @@ class ReActAgent:
                 # ... invalid Action format
                 continue
 
-            print(f"🎬 Action: {tool_name}[{tool_input}]")
+            print(f"🎬 [bold green]Action[/bold green]: {tool_name}[{tool_input}]")
 
             tool_func = self.tool_executor.getTool(tool_name)
             if not tool_func:
-                observation = f"Error: `{tool_name}` is not a valid tool"
+                observation = f"[bold red]Error: `{tool_name}` is not a valid tool[/bold red]"
             else:
                 observation = tool_func(tool_input)
 
-            print(f"👀 Observation: {observation}")
+            print(f"👀 [bold green]Observation[/bold green]:\n {observation}")
 
             # 5. Adding action and observation to history
             self.history.append(f"Action: {action}")
             self.history.append(f"Observation: {observation}")
             
         # Loop ended
-        print("Reach largest steps, progress stop.")
+        print("[bold green]Reach largest steps, progress stop.[/bold green]")
         return None
             
             
@@ -143,8 +144,9 @@ if __name__ == "__main__":
     executor.registerTool("Search", description, search)
 
     # Print all available tools
-    print("\n--------- Available tools ---------")
+    print("\n[green]--------- Available tools ---------[/green]")
     print(executor.getAvailableTools())
+    print()
 
 
     agent = ReActAgent(llm_client=client, tool_executor=executor)

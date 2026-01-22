@@ -2,6 +2,7 @@ import os
 from serpapi import GoogleSearch
 from dotenv import load_dotenv
 from typing import Any, Callable
+from rich import print
 
 
 # Search tool
@@ -10,7 +11,7 @@ def search(query: str) -> str:
     一个基于SerpApi的实战网页搜索引擎工具。
     它会智能地解析搜索结果，优先返回直接答案或知识图谱信息。
     """
-    print(f"🔍 Executing [SerpApi] web search: {query}")
+    print(f"🔍 [bold green]Executing [SerpApi] web search[/bold green]: {query}")
     try:
         api_key = os.getenv("SERPAPI_API_KEY")
         if not api_key:
@@ -69,16 +70,16 @@ class ToolExecutor:
     # Register a new tool in `ToolExecutor.tools`
     def registerTool(self, name: str, description: str, func: Callable):
         if name in self.tools:
-            print(f"Warning:tool `{name}` has already been registered, the old one will be replaced.")
+            print(f"[yellow]Warning:tool `{name}` has already been registered, the old one will be replaced.[/yellow]")
         self.tools[name] = {"description": description, "func": func}
-        print(f"Tool `{name}` is registered.")
+        print(f"[yellow]Tool `{name}` is registered.[/yellow]")
 
     # Get the function of a tool by name
     def getTool(self, name: str) -> Callable|None:
         if name in self.tools:
             return self.tools[name]["func"]
         
-        print(f"Error: Tool '{name}' not found in toolbox.")
+        print(f"[bold red]Error: Tool '{name}' not found in toolbox.[/bold red]")
         return None
 
     # Acquire format description string of all usable tools
