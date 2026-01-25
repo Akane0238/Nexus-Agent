@@ -1,6 +1,7 @@
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
+from typing import Optional
 from rich.console import Console
 
 class NexusAgentsLLM:
@@ -9,7 +10,7 @@ class NexusAgentsLLM:
     Capsulate OpenAI interface and use streaming response by default.
     """
     
-    def __init__(self, model: str = None, apiKey: str = None, baseURL: str = None, timeout: int = None) -> None:  # type: ignore
+    def __init__(self, model: Optional[str] = None, apiKey: Optional[str] = None, baseURL: Optional[str] = None, timeout: Optional[int] = None) -> None:
         """
         Initialize client.
         """
