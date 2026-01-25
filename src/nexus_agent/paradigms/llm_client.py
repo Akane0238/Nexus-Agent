@@ -9,6 +9,7 @@ class NexusAgentsLLM:
     Self-defined LLM client. 
     Capsulate OpenAI interface and use streaming response by default.
     """
+    console = Console() # log for debug
     
     def __init__(self, model: Optional[str] = None, apiKey: Optional[str] = None, baseURL: Optional[str] = None, timeout: Optional[int] = None) -> None:
         """
@@ -24,7 +25,6 @@ class NexusAgentsLLM:
         
         self.model = m
         self.client = OpenAI(api_key=key, base_url=url, timeout=timeout)
-        self.console = Console() # log for debug
     
     
     def think(self, message: list[dict[str, str]], temperature: float = 0) -> str | None :
@@ -48,7 +48,7 @@ class NexusAgentsLLM:
             # return the complete response in string
             return "".join(collected_content)
         except Exception as e:
-            self.console.print(f"❌ [bold red]Error when calling LLM API[/red]: [red]{e}[/red]")
+            self.console.print(f"❌ [bold red]Error when calling LLM API[/bold red]: [red]{e}[/red]")
             return None
 
 
