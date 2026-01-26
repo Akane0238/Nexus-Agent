@@ -1,7 +1,7 @@
 import os
 from typing import Optional
 from openai import OpenAI
-from src.nexus_agent.paradigms.llm_client import NexusAgentsLLM
+from src.core.llm import NexusAgentsLLM
 
 
 class MyLLM(NexusAgentsLLM):
@@ -35,7 +35,7 @@ class MyLLM(NexusAgentsLLM):
             self.timeout = kwargs.get('timeout', 60)
 
             # Create an OpenAI client instant
-            self.client = OpenAI(
+            self._client = OpenAI(
                 api_key=self.api_key,
                 base_url=self.base_url,
                 timeout=self.timeout
