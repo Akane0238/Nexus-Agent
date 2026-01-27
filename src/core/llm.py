@@ -46,8 +46,6 @@ class NexusAgentsLLM:
         # auto detect if `provider` not set
         self.provider = provider.lower() if provider else self._auto_detect_provider(api_key=apiKey, base_url=baseURL)
         
-        print(f"\n-------provider---------\n{self.provider}\n")
-
         if self.provider == "custom":
             # Customized url and api key
             self.api_key = apiKey or os.getenv("LLM_API_KEY")
@@ -123,7 +121,6 @@ class NexusAgentsLLM:
             return resolved_api_key, resolved_base_url
  
 
-
     def think(self, messages: List[dict[str, str]], temperature: float = 0) -> str | None :
         """
         Calling LLM to think and return streaming response.
@@ -133,7 +130,7 @@ class NexusAgentsLLM:
             temperature: temperature of model
         """
 
-        self.console.print(f"🧠 [bold magenta]Calling {self.model} Model...[/bold magenta]")
+        self.console.print(f"[bold magenta][Client] 🧠 Calling {self.model} Model...[/bold magenta]")
         try:
             response = self._client.chat.completions.create(
                 model=self.model, # type: ignore
@@ -144,7 +141,7 @@ class NexusAgentsLLM:
             )
 
             # handle streaming response
-            self.console.print("✅ [bold magenta]LLM successfully response[/bold magenta]:")
+            self.console.print("[bold magenta][Client] ✅ LLM successfully response[/bold magenta]:")
             collected_content = []
             for chunk in response:
                 content = chunk.choices[0].delta.content or ""
@@ -155,7 +152,7 @@ class NexusAgentsLLM:
             # return the complete response in string
             return "".join(collected_content)
         except Exception as e:
-            self.console.print(f"❌ [bold red]Error when calling LLM API[/bold red]: [red]{e}[/red]")
+            self.console.print(f"[bold red][Client] ❌ Error when calling LLM API[/bold red]: [red]{e}[/red]")
             return None
 
 
