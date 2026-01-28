@@ -1,6 +1,6 @@
 from typing import Any, Callable, Optional
 from rich import print as rprint
-from tool_base import Tool
+from .tool_base import Tool
 
 
 class ToolRegistry:
@@ -63,8 +63,28 @@ class ToolRegistry:
 
 
     def execute_tool(self, tool_name: str, parameters: str) -> str:
+        """
+        Args:
+            `name`: tool name
+            `parameters`: input parameters
+        """
+        # Search `Tool` object first
         tool = self.get_tool(tool_name)
-        return ""
+        if tool:
+            try:
+                return tool.run({"input": parameters})
+            except Exception as e:
+                return f"Error: exception in tool `{tool_name}` execution: {str(e)}"
+
+        # Search `func` function tool
+        func = self.get_funtion(tool_name)
+        if func:
+            try:
+                return func(parameters)
+            except Exception as e:
+                return f"Error: exception in function `{tool_name}` execution: {str(e)}"
+
+        return f"Error: does not find the tool named {tool_name}"
 
 
 # Global tool registry
