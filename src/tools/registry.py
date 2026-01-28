@@ -1,4 +1,3 @@
-from types import FunctionType
 from typing import Any, Callable, Optional
 from rich import print as rprint
 from tool_base import Tool
@@ -66,3 +65,7 @@ class ToolRegistry:
     def execute_tool(self, tool_name: str, parameters: str) -> str:
         tool = self.get_tool(tool_name)
         return ""
+
+
+# Global tool registry
+global_registry = ToolRegistry()
