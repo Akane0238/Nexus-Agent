@@ -1,7 +1,7 @@
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
-from typing import Optional, Literal, List
+from typing import Optional, Literal, List, Iterator
 from rich.console import Console
 
 
@@ -121,16 +121,16 @@ class NexusAgentsLLM:
             return resolved_api_key, resolved_base_url
  
 
-    def think(self, messages: List[dict[str, str]], temperature: float = 0) -> str | None :
+    def think(self, messages: List[dict[str, str]], temperature: float = 0) -> Iterator[str] :
         """
-        Calling LLM to think and return streaming response.
+        Invoking LLM to think and return streaming response.
 
         Args:
             messages: list of message
             temperature: temperature of model
         """
 
-        self.console.print(f"[bold magenta][Client] 🧠 Calling {self.model} Model...[/bold magenta]")
+        self.console.print(f"[bold magenta][Client] 🧠 Invoking {self.model} Model...[/bold magenta]")
         try:
             response = self._client.chat.completions.create(
                 model=self.model, # type: ignore
@@ -140,39 +140,37 @@ class NexusAgentsLLM:
                 stream=True,
             )
 
-            # handle streaming response
+            # Handle streaming response
             self.console.print("[bold magenta][Client] ✅ LLM successfully response[/bold magenta]:")
             collected_content = []
             for chunk in response:
                 content = chunk.choices[0].delta.content or ""
                 self.console.out(content, end="", style="cyan")
                 collected_content.append(content)
+                # return the iterator
+                yield content
             self.console.print()
             
-            # return the complete response in string
-            return "".join(collected_content)
         except Exception as e:
-            self.console.print(f"[bold red][Client] ❌ Error when calling LLM API[/bold red]: [red]{e}[/red]")
-            return None
+            self.console.print(f"[bold red][Client] ❌ Error when invoking LLM API[/bold red]: [red]{e}[/red]")
+            raise ConnectionError(f"Invoke LLM failed: {e}")
 
 
-# --- Testing ---
-if __name__ == "__main__":
-    # Loading enviroment variables from `.env`
-    load_dotenv()
-    
-    try:
-        llmClient = NexusAgentsLLM()
+    def invoke(self, messages: List[dict[str, str]], **kwargs) -> str:
+        """
+        Non-streaming LLM invocation, return complete response.
+        """
+        try:
+            response = self._client.chat.completions.create(
+                model=self.model, # type: ignore
+                messages=messages, # type: ignore
+                temperature=kwargs.get('temperature', self.temperature),
+                max_tokens=kwargs.get('max_tokens', self.max_tokens),
+                **{k: v for k, v in kwargs.items() if k not in ['temperature', 'max_tokens']}
+            )
+            return response.choices[0].message.content
 
-        msg = [
-            {"role": "system", "content": "You are a helpful assistant that writes Golang code."},
-            {"role": "user", "content": "Write a function to complete quick sorting algorithm."}
-        ]
+        except Exception as e:
+            self.console.print(f"[bold red][Client] ❌ Error when invoking LLM API[/bold red]: [red]{e}[/red]")
+            raise ConnectionError(f"Invoke LLM failed: {e}")
 
-        print(f"--- Calling LLM ---")
-        res = llmClient.think(msg)
-        if res:
-            print("\n\n--- Complete model's response ---")
-            print(res)
-    except ValueError as e:
-        print(e)

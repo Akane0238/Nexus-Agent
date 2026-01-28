@@ -1,4 +1,5 @@
 # test_myllm.py
+from rich import print as rprint
 from src.core.my_llm import MyLLM 
 from src.core.llm import NexusAgentsLLM
 
@@ -12,6 +13,8 @@ def test_myllm():
     response_stream = llm.think(messages=messages)
     assert response_stream
     # think中已流式输出
+    for chunk in response_stream:
+        pass
 
 def test_ollama():
     """测试ollama本地模型服务"""
@@ -22,16 +25,28 @@ def test_ollama():
     )
     response_stream = llm.think(messages=messages)
     assert response_stream
+    for chunk in response_stream:
+        pass
 
 def test_dotenv():
     """`.env`提供环境变量定义base_url与api_key"""
     llm = NexusAgentsLLM()
     response_stream = llm.think(messages=messages)
     assert response_stream
+    for chunk in response_stream:
+        pass
 
 def test_provider():
     """通过传入provider参数自动解析base_url"""
     llm = NexusAgentsLLM(provider="siliconflow")
     response_stream = llm.think(messages=messages)
     assert response_stream
+    for chunk in response_stream:
+        pass
 
+def test_invoke():
+    """测试llm client的非流式输出invoke()"""
+    llm = NexusAgentsLLM()
+    response = llm.invoke(messages=messages)
+    assert response 
+    rprint(f"\n[cyan]LLM 非流式输出响应：\n{response}[/cyan]")
