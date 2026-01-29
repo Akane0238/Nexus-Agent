@@ -6,7 +6,6 @@ from src.tools.registry import ToolRegistry
 from src.core.config import Config
 from src.core.message import Message
 from src.core.agent import Agent
-from src.tools.tool_base import Tool
 
 
 # Default ReAct prompt template
@@ -53,17 +52,18 @@ class ReActAgent(Agent):
         self,
         name: str,
         llm: NexusAgentsLLM,
-        tool_registry: ToolRegistry,
+        tool_registry: Optional[ToolRegistry] = None,
         system_prompt: Optional[str] = None,
         custom_prompt: Optional[str] = None,
         config: Optional[Config] = None,
         max_steps: int = 5
     ):
         super().__init__(name, llm, system_prompt, config)
-        self.tool_registry = tool_registry
+        self.tool_registry = tool_registry if tool_registry else ToolRegistry()
         self.max_steps = max_steps
         self.current_history: list[str] = []
         self.prompt_template = custom_prompt if custom_prompt else REACT_PROMPT_TEMPLATE
+
         rprint(f"[bold magenta][Agent] ✅ {name} Initialization complete, max steps: {max_steps}[/bold magenta]")
 
     
