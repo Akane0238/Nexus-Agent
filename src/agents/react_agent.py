@@ -1,23 +1,35 @@
 import re
-from dotenv import load_dotenv
-from llm_client import NexusAgentsLLM
-from tools import ToolExecutor, search
-from rich import print
+from typing import Optional
+from rich import print as rprint
+from src.core.llm import NexusAgentsLLM
+from src.tools.registry import ToolRegistry
+from src.core.config import Config
+from src.core.message import Message
+from src.core.agent import Agent
+from src.tools.tool_base import Tool
 
-# ReAct prompt template
+
+# Default ReAct prompt template
 REACT_PROMPT_TEMPLATE = """
-请注意，你是一个有能力调用外部工具的智能助手。
+你是一个具备推理和行动能力的AI助手。你可以通过思考分析问题，然后调用合适的工具来获取信息，最终给出准确的答案。
 
-可用工具如下:
+## 可用工具
 {tools}
 
-请严格按照以下格式进行回应:
+## 工作流程
+请严格按照以下格式进行回应，每次只能执行一个步骤:
 
 Thought: 你的思考过程，用于分析问题、拆解任务和规划下一步行动。
-Action: 你决定采取的行动，必须是以下格式之一:
+Action: 选择合适的工具获取信息，格式必须是以下之一:
 - `tool_name[tool_input]`:调用一个可用工具。
-- `Finish[最终答案]`:当你认为已经获得最终答案时。
-- 当你收集到足够的信息，能够回答用户的最终问题时，你必须在Action:字段后使用 Finish[最终答案] 来输出最终答案。
+- `Finish[最终答案]`:当你有足够信息给出最终答案时。
+
+## 重要提醒
+1. 每次回应必须包含Thought和Action两部分
+2. 工具调用的格式必须严格遵循:工具名[参数]
+3. 只有当你确信有足够信息回答问题时，必须在 `Action:` 字段后使用 `Finish[最终答案]` 来输出最终答案
+4. 如果工具返回的信息不够，继续使用其他工具或相同工具的不同参数
+
 
 示例回应 1：
 Though: 为了了解最新的DeepSeek模型，我需要通过工具`Search`在网络上搜索最新的信息。
@@ -27,18 +39,33 @@ Action: Search[DeepSeek最新模型是什么]
 Though: 通过搜索引擎工具我知道了DeepSeek目前最新的模型是 DeepSeek-V3.2，我已经收集了足够的信息来输出最终答案了。
 Action: Finish[DeepSeek最新的模型是 DeepSeek-V3.2]
 
----
-现在，请开始解决以下问题:
-Question: {question}
-History: {history}
+## 当前任务
+**Question:** {question}
+
+## 执行历史
+**History:** {history}
+
+现在开始你的推理和行动：
 """
 
-class ReActAgent:
-    def __init__(self, llm_client: NexusAgentsLLM, tool_executor: ToolExecutor, max_steps: int = 3) -> None:
-        self.llm_client = llm_client
-        self.tool_executor = tool_executor
+class ReActAgent(Agent):
+    def __init__(
+        self,
+        name: str,
+        llm: NexusAgentsLLM,
+        tool_registry: ToolRegistry,
+        system_prompt: Optional[str] = None,
+        custom_prompt: Optional[str] = None,
+        config: Optional[Config] = None,
+        max_steps: int = 5
+    ):
+        super().__init__(name, llm, system_prompt, config)
+        self.tool_registry = tool_registry
         self.max_steps = max_steps
-        self.history = []
+        self.current_history: list[str] = []
+        self.prompt_template = custom_prompt if custom_prompt else REACT_PROMPT_TEMPLATE
+        rprint(f"[bold magenta][Agent] ✅ {name} Initialization complete, max steps: {max_steps}[/bold magenta]")
+
     
     # Helper function: Extract `Thought` and `Action`
     def  _parse_output(self, ouput: str):
@@ -61,49 +88,57 @@ class ReActAgent:
         return tool_name, tool_input
 
     # Run ReAct agent to start answering a question
-    def run(self, question: str):
-        self.history = [] # reset hitory everytime when agent runs
+    def run(self, input_text: str, **kwargs) -> str:
+        self.current_history = [] # reset hitory everytime when agent runs
         current_step = 0
-        
+
+        rprint(f"\n[bold magenta][Agent] 🤖 Start solving problem [/bold magenta]")
+       
         # Main loop
         while current_step < self.max_steps:
             current_step += 1
-            print(f"[bold green]--- Step {current_step} ---[/bold green]")
+            rprint(f"[bold green]--- ReAct Step {current_step}/{self.max_steps} ---[/bold green]")
 
             # 1. Formating prompt
-            tools_desc = self.tool_executor.getAvailableTools()
-            history_str = "\n".join(self.history)
+            tools_desc = self.tool_registry.get_tools_description()
+            history_str = "\n".join(self.current_history)
 
-            prompt = REACT_PROMPT_TEMPLATE.format(
+            prompt = self.prompt_template.format(
                 tools = tools_desc,
-                question = question,
+                question = input_text,
                 history = history_str
             )
 
             # 2. Calling LLM to think
             messages = [{"role": "user", "content": prompt}]
 
-            response_txt = self.llm_client.think(message=messages)
+            response = self.llm.invoke(messages, **kwargs)
 
-            if not response_txt:
-                print("[bold red]Error: LLM cannot return a valid reponse.[/bold red]")
+            if not response:
+                rprint("[bold red][Agent] Error: LLM cannot return a valid reponse.[/bold red]")
                 break
             
+            rprint(f"[bold magenta][Client] LLM response[/bold magenta]:\n[bold white]{response}[/bold white]")
+
             # 3. Parsing LLM output and taking action
-            thought, action = self._parse_output(response_txt)
+            thought, action = self._parse_output(response)
 
             # if thought:
-            #    print(f"thought: {thought}")
+            #    rprint(f"[bold magenta][Client] thought[/bold magenta]:\n[bold white]{thought}[/bold white]")
 
             if not action:
-                print("[bold red]Warning: cannot parse valid Action, progress stop.[/bold red]")
+                rprint("[bold red][Agent] Warning: cannot parse valid Action, progress stop.[/bold red]")
                 break
 
-            # 4. Executing action and Observing
+            # 4. Executing action and observing
             if action.startswith("Finish"):
                 answer = ans.group(1) if (ans := re.search(r"Finish\[(.*)\]", action)) else ""
 
-                print(f"🎉 [bold green]Final answer[/bold green]: {answer}")
+                # Update history
+                self.add_message(Message(input_text, "user"))
+                self.add_message(Message(answer, "assistant"))
+
+                rprint(f"[bold green][Agent] 🎉 Final answer[/bold green]:\n[bold white]{answer}[/bold white]")
                 return answer
 
             # LLM wants to use tools
@@ -113,41 +148,21 @@ class ReActAgent:
                 # ... invalid Action format
                 continue
 
-            print(f"🎬 [bold green]Action[/bold green]: {tool_name}[{tool_input}]")
+            rprint(f"[bold green][Agent] 🎬 Action[/bold green]: [bold white]{tool_name}[{tool_input}][/bold white]")
 
-            tool_func = self.tool_executor.getTool(tool_name)
-            if not tool_func:
-                observation = f"[bold red]Error: `{tool_name}` is not a valid tool[/bold red]"
-            else:
-                observation = tool_func(tool_input)
+            observation = self.tool_registry.execute_tool(tool_name, tool_input)
 
-            print(f"👀 [bold green]Observation[/bold green]:\n {observation}")
+            rprint(f"[bold green][Agent] 👀 Observation[/bold green]:\n[bold white]{observation}[/bold white]")
 
             # 5. Adding action and observation to history
-            self.history.append(f"Action: {action}")
-            self.history.append(f"Observation: {observation}")
-            
+            self.current_history.append(f"Action: {action}")
+            self.current_history.append(f"Observation: {observation}")
+
         # Loop ended
-        print("[bold green]Reach largest steps, progress stop.[/bold green]")
-        return None
+        rprint("[bold green]Reach largest steps, progress stop.[/bold green]")
+        final_answer = "Sorry, I cannot finish this task in given steps."
+        self.add_message(Message(input_text, "user"))
+        self.add_message(Message(final_answer, "assistant"))
+        return final_answer
+
             
-            
-
-# --- Test ---
-if __name__ == "__main__":
-    load_dotenv()
-    client = NexusAgentsLLM()
-    executor = ToolExecutor()
-
-    # Register searching tool `search()`
-    description = "一个网页搜索引擎。当你需要回答关于时事、事实以及在你的知识库中找不到的信息时，应使用此工具。"
-    executor.registerTool("Search", description, search)
-
-    # Print all available tools
-    print("\n[green]--------- Available tools ---------[/green]")
-    print(executor.getAvailableTools())
-    print()
-
-
-    agent = ReActAgent(llm_client=client, tool_executor=executor)
-    agent.run("明天广州的气温是多少度")
