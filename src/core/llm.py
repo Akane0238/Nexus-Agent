@@ -111,7 +111,7 @@ class NexusAgentsLLM:
             return resolved_api_key, resolved_base_url
         elif self.provider == "ollama":
             resolved_base_url = base_url or os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434/v1"
-            return "", resolved_base_url
+            return "ollama-123qwe", resolved_base_url
        # ...
 
         else:
@@ -160,6 +160,7 @@ class NexusAgentsLLM:
         """
         Non-streaming LLM invocation, return complete response.
         """
+        self.console.print(f"[bold magenta][Client] 🧠 Invoking {self.model} Model...[/bold magenta]")
         try:
             response = self._client.chat.completions.create(
                 model=self.model, # type: ignore

@@ -1,14 +1,14 @@
 """Basic communicating agent implement"""
 import re
-from re import Match
-from typing import Optional, Iterator, final
+from typing import Optional, Iterator, Callable
 from rich import print as rprint
 
-from core.llm import NexusAgentsLLM
-from core.agent import Agent
-from core.config import Config
-from core.message import Message
-from tools.registry import ToolRegistry
+from src.core.llm import NexusAgentsLLM
+from src.core.agent import Agent
+from src.core.config import Config
+from src.core.message import Message
+from src.tools.registry import ToolRegistry
+from src.tools.tool_base import Tool
 
 
 class SimpleAgent(Agent):
@@ -38,7 +38,9 @@ class SimpleAgent(Agent):
 
     
     def _get_enhanced_system_prompt(self) -> str:
-        """Build an enhanced system prompt including tools information."""
+        """
+        Build an enhanced system prompt including tools information
+        """
         base_prompt = self.system_prompt or "你是一个有用的AI助手。"
 
         if not self.enable_tool_use or not self.tool_registry:
@@ -75,8 +77,11 @@ class SimpleAgent(Agent):
 
 
     def _parse_tool_uses(self, response: str) -> list:
-        pattern = r"\[TOOL_USE:([^:]+):([\]]+)\]"
+        pattern = r"\[TOOL_USE:([^:]+):([^\]]+)\]"
         matches = re.findall(pattern, response)
+
+        if not matches:
+            rprint(f"[bold magenta][Agent] LLM responsed with wrong tool use format, no pattern found [/bold magenta]")
 
         tool_uses = [] # list of tool callings
         for tool_name, params_raw in matches:
@@ -137,19 +142,25 @@ class SimpleAgent(Agent):
         final_response = ""
 
         while current_iteration < max_tool_iterations:
+            rprint(f"[bold blue]--- _run_with_tools: iteration {current_iteration+1}/{max_tool_iterations} ---[/bold blue]")
             response = self.llm.invoke(messages, **kwargs)
+            rprint(f"[bold magenta][Client] ✅ LLM successfully response[/bold magenta]:\n[cyan]{response}[/cyan]")
+
             # Parsing response
             tool_uses = self._parse_tool_uses(response)
 
+            rprint(f"[bold magenta][Agent] 🔧 Detecting {len(tool_uses)} tool uses[/bold magenta]\n")
             if tool_uses:
-                rprint(f"[bold magenta][Agent] 🔧 Detecting {len(tool_uses)} tool uses[/bold magenta]\n")
                 # Calling all tools
                 results = []
                 clean_response = response # without tools calling information
 
                 for tool_use in tool_uses:
-                    rprint(f"[bold magenta][Agent] 🔧 Tool `{tool_use['tool_name']}` executing...[/bold magenta]\n")
+                    rprint(f"[bold magenta][Agent] 🔧 Tool `{tool_use['tool_name']}` executing...[/bold magenta]")
+                    rprint(f"[bold white]- {tool_use['original']}[/bold white]")
+
                     result = self._execute_tool_use(tool_use["tool_name"], tool_use["parameters"])
+                    rprint(f"[bold white]- {result}[/bold white]\n")
                     results.append(result)
                     clean_response = clean_response.replace(tool_use["original"], "")
 
@@ -212,6 +223,48 @@ class SimpleAgent(Agent):
 
         # Muti-round tool use response
         return self._run_with_tools(messages, input_text, max_tool_iterations, **kwargs)
+
+
+    def stream_run(self, input_text: str, **kwargs) -> Iterator[str]:
+        """
+        Self-defined streaming run method, tool use disabled
+        """
+
+        rprint(f"[bold magenta][Agent] 🤖 {self.name} is processing in streaming way: {input_text}[/bold magenta]")
+
+        messages = []
+
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+
+        for msg in self._history:
+            messages.append({"role": msg.role, "content": msg.content})
+
+        messages.append({"role": "user", "content": input_text})
+
+        
+        full_response = ""
+        temperature = kwargs.get("temperature") 
+        for chunk in self.llm.think(messages, temperature if temperature else 0):
+            full_response += chunk
+            # Already print in think()
+            yield chunk
+
+        print()
+
+        self.add_message(Message(input_text, "user"))
+        self.add_message(Message(full_response, "assistant"))
+        rprint(f"[bold magenta][Agent] ✅ {self.name} streaming responsed[/bold magenta]")
+
+
+    def list_tools(self) -> list:
+        """
+        List all available tools and functions
+        """
+        if self.tool_registry:
+            return self.tool_registry.list_tools()
+
+        return []
 
 
 
