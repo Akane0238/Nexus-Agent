@@ -38,6 +38,17 @@ class ToolRegistry:
         rprint(f"[bold magenta][Registry] ✅ Function `{name}` is registered [/bold magenta]")
 
 
+    def unregister(self, tool_name: str):
+        if tool_name in self._tools:
+            self._tools.pop(tool_name)
+            rprint(f"[bold magenta][Registry] ✅ Tool `{tool_name}` has been removed[/bold magenta]")
+        elif tool_name in self._functions:
+            self._functions.pop(tool_name)
+            rprint(f"[bold magenta][Registry] ✅ Function `{tool_name}` has been removed[/bold magenta]")
+        else:
+            rprint(f"[yellow][Registry] ⚠️ There is no tool/function named `{tool_name}` [/yellow]")
+
+
     def get_tools_description(self) -> str:
         """
         Acquire formatted description strings of all available tools.
@@ -60,6 +71,20 @@ class ToolRegistry:
     def get_funtion(self, func_name: str) -> Optional[Callable[[str], str]]:
         info = self._functions.get(func_name)
         return info.get("func") if info else None
+
+    
+    def list_tools(self) -> list[str]:
+        """
+        List all the tools name
+        """
+        tools = []
+        for tool in self._tools.keys():
+            tools.append(tool)
+        
+        for func in self._functions.keys():
+            tools.append(func)
+
+        return tools
 
 
     def execute_tool(self, tool_name: str, parameters: str) -> str:
