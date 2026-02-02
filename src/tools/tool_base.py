@@ -27,7 +27,7 @@ class Tool(ABC):
 
 
     @abstractmethod
-    def get_parameters(self) -> list[Callable]:
+    def get_parameters(self) -> list[ToolParameter]:
         """Acquire parameter definition of tool"""
         pass
 
