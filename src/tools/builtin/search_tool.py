@@ -1,11 +1,12 @@
 import os
-from typing import Optional
+from typing import Optional, Literal, Any, Iterable
+from pydantic import BaseModel, Field
 from tavily import TavilyClient
 from serpapi import GoogleSearch
 from rich import print as rprint
-from typing import Any, Iterable
 
-from src.tools.tool_base import Tool, ToolParameter
+from src.tools.tool_base import Tool
+
 
 CHARS_PER_TOKEN = 4
 DEFAULT_MAX_RESULTS = 5
@@ -15,6 +16,23 @@ SUPPORTED_BACKENDS = {
     "tavily",
     "serpapi",
 }
+
+class SearchInput(BaseModel):
+    """Pydantic model for SearchTool parameters"""
+
+    query: str = Field(description="搜索查询关键词")
+    backend: Optional[Literal["hybrid", "tavily", "serpapi"]] = Field(
+        default="hybrid", description="搜索后端选择，默认混合模式"
+    )
+    mode: Optional[Literal["text", "structured", "json", "dict"]] = Field(
+        default="text", description="返回模式：文本或结构化数据"
+    )
+    fetch_full_page: bool = Field(default=False, description="是否获取完整页面内容")
+    max_results: int = Field(default=DEFAULT_MAX_RESULTS, description="最大搜索结果数")
+    max_tokens_per_source: int = Field(
+        default=2000, description="每个搜索结果的最大token数"
+    )
+
 
 def _limit_text(text: str, token_limit: int) -> str:
     char_limit = token_limit * CHARS_PER_TOKEN
@@ -61,15 +79,16 @@ class SearchTool(Tool):
         2. Tavily API (tavily) - professional AI Search
         3. SerpApi (serpapi) - traditional Google Search
     """
+
     def __init__(
         self,
         backend: str = "hybrid",
         tavily_key: Optional[str] = None,
-        serpapi_key: Optional[str] = None
+        serpapi_key: Optional[str] = None,
     ):
         super().__init__(
-            name = "search",
-            description= "一个智能网页搜索引擎。支持混合搜索模式，自动选择最佳搜索源。"
+            name="search",
+            description="一个智能网页搜索引擎。支持混合搜索模式，自动选择最佳搜索源。",
         )
         self.backend = backend.lower()
         self.tavily_key = tavily_key or os.getenv("TAVILY_API_KEY")
@@ -79,17 +98,17 @@ class SearchTool(Tool):
         self.available_backends: list[str] = []
         self._setup_backends()
 
-
-    def run(self, parameters: dict[str, Any]) -> str | dict[str, Any]: # type:ignore[override]
-        query = (parameters.get("input") or parameters.get("query") or "").strip()
+    def run(self, parameters: dict[str, Any]) -> str | dict[str, Any]:
+        """Execute search with validated parameters"""
+        query = (parameters.get("query") or "").strip()
         if not query:
             return "Error: search query cannot be empty"
-        
+
         backend = str(parameters.get("backend", self.backend)).lower()
         if backend not in SUPPORTED_BACKENDS:
             backend = "hybrid"
 
-        mode = str(parameters.get("mode") or parameters.get("return_mode") or "text").lower()
+        mode = str(parameters.get("mode") or "text").lower()
         if mode not in SUPPORTED_RETURN_MODES:
             mode = "text"
 
@@ -102,25 +121,17 @@ class SearchTool(Tool):
             backend=backend,
             fetch_full_page=fetch_full_page,
             max_results=max_results,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
         )
 
         if mode in {"structured", "json", "dict"}:
             return payload
-        
+
         return self._format_text_response(query=query, payload=payload)
-        
 
-    def get_parameters(self) -> list[ToolParameter]:
-        return [
-            ToolParameter(
-                name="input",
-                type="string",
-                description="搜索查询关键词",
-                required=True
-            ),
-        ]
-
+    def get_input_schema(self):
+        """Return Pydantic model for parameter validation"""
+        return SearchInput
 
     def _setup_backends(self):
         if self.serpapi_key:
@@ -167,21 +178,21 @@ class SearchTool(Tool):
                 query=query,
                 fetch_full_page=fetch_full_page,
                 max_results=max_results,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
             )
         elif backend == "tavily":
             return self._search_tavily(
                 query=query,
                 fetch_full_page=fetch_full_page,
                 max_results=max_results,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
             )
         elif backend == "serpapi":
             return self._search_serpapi(
                 query=query,
                 fetch_full_page=fetch_full_page,
                 max_results=max_results,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
             )
         else:
             raise ValueError(f"Unsupported search backend: {backend}")
@@ -194,7 +205,7 @@ class SearchTool(Tool):
         max_results: int,
         max_tokens: int,
     ) -> dict[str, Any]:
-        notices = [] # collecting error messages when searching
+        notices = []  # collecting error messages when searching
 
         # Use `Tavily` in prior
         if "tavily" in self.available_backends:
@@ -203,7 +214,7 @@ class SearchTool(Tool):
                     query=query,
                     fetch_full_page=fetch_full_page,
                     max_results=max_results,
-                    max_tokens=max_tokens
+                    max_tokens=max_tokens,
                 )
             except Exception as e:
                 msg = f"Tavily failed to search: {e}"
@@ -220,7 +231,7 @@ class SearchTool(Tool):
                     query=query,
                     fetch_full_page=fetch_full_page,
                     max_results=max_results,
-                    max_tokens=max_tokens
+                    max_tokens=max_tokens,
                 )
             except Exception as e:
                 msg = f"SerpApi failed to search: {e}"
@@ -242,7 +253,6 @@ class SearchTool(Tool):
             answer=error_message,
             notices=notices
         )
-                
 
     def _search_tavily(
         self,
@@ -281,7 +291,6 @@ class SearchTool(Tool):
             backend="tavily",
             answer=response.get("answer"),
         )
-
 
     def _search_serpapi(
         self,
@@ -323,7 +332,6 @@ class SearchTool(Tool):
             )
 
         return _structured_payload(results, backend="serpapi", answer=answer)
-
 
     def _format_text_response(self, *, query: str, payload: dict[str, Any]) -> str:
         answer = payload.get("answer")
