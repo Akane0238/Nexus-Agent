@@ -101,7 +101,7 @@ class Tool(ABC):
 
         if schema_cls:
             try:
-                validated = schema_cls(**parameters)
+                validated = schema_cls.model_validate(parameters)
                 return True, validated.model_dump(), None
             except ValidationError as e:
                 return False, None, str(e)
