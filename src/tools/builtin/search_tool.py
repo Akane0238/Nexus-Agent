@@ -1,6 +1,6 @@
 import os
 from typing import Optional, Literal, Any, Iterable
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from tavily import TavilyClient
 from serpapi import GoogleSearch
 from rich import print as rprint
@@ -17,8 +17,11 @@ SUPPORTED_BACKENDS = {
     "serpapi",
 }
 
+
 class SearchInput(BaseModel):
     """Pydantic model for SearchTool parameters"""
+
+    model_config = ConfigDict(extra="ignore")
 
     query: str = Field(description="搜索查询关键词")
     backend: Optional[Literal["hybrid", "tavily", "serpapi"]] = Field(
@@ -27,18 +30,29 @@ class SearchInput(BaseModel):
     mode: Optional[Literal["text", "structured", "json", "dict"]] = Field(
         default="text", description="返回模式：文本或结构化数据"
     )
-    fetch_full_page: Optional[bool] = Field(default=False, description="是否获取完整页面内容")
-    max_results: Optional[int] = Field(default=DEFAULT_MAX_RESULTS, description="最大搜索结果数")
+    fetch_full_page: Optional[bool] = Field(
+        default=False, description="是否获取完整页面内容"
+    )
+    max_results: Optional[int] = Field(
+        default=DEFAULT_MAX_RESULTS, description="最大搜索结果数"
+    )
     max_tokens_per_source: Optional[int] = Field(
         default=2000, description="每个搜索结果的最大token数"
     )
 
+    @field_validator("query")
+    @classmethod
+    def validate_query(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("query cannot be empty")
+        return v.strip()
 
 def _limit_text(text: str, token_limit: int) -> str:
     char_limit = token_limit * CHARS_PER_TOKEN
     if len(text) <= char_limit:
         return text
     return text[:char_limit] + "... [truncated]"
+
 
 def _normalized_result(
     *,
@@ -55,6 +69,7 @@ def _normalized_result(
     if raw_content is not None:
         payload["raw_content"] = raw_content
     return payload
+
 
 def _structured_payload(
     results: Iterable[dict[str, Any]],
@@ -138,31 +153,45 @@ class SearchTool(Tool):
             try:
                 self.tavily_client = TavilyClient(api_key=self.tavily_key)
                 self.available_backends.append("tavily")
-                rprint("[bold blue][Tool] ✅ `Tavily` search engine has been initialized[/bold blue]")
+                rprint(
+                    "[bold blue][Tool] ✅ `Tavily` search engine has been initialized[/bold blue]"
+                )
             except Exception as e:
-                rprint(f"[bold red][Tool] ⚠️ Tavily failed to initialize: {e}[/bold red]")
+                rprint(
+                    f"[bold red][Tool] ⚠️ Tavily failed to initialize: {e}[/bold red]"
+                )
         else:
             rprint("[yellow][Tool] ⚠️ `TAVILY_API_KEY` does not set[/yellow]")
 
         if self.serpapi_key:
             self.available_backends.append("serpapi")
-            rprint("[bold blue][Tool] ✅ `serpapi` search engine has been initialized[/bold blue]")
+            rprint(
+                "[bold blue][Tool] ✅ `serpapi` search engine has been initialized[/bold blue]"
+            )
         else:
             rprint("[yellow][Tool] ⚠️ `SERPAPI_API_KEY` does not set[/yellow]")
 
         if self.backend not in SUPPORTED_BACKENDS:
-            rprint(f"[yellow][Tool] Unsupported searching backend `{self.backend}`, going to use `hybrid` mode[/yellow]")
+            rprint(
+                f"[yellow][Tool] Unsupported searching backend `{self.backend}`, going to use `hybrid` mode[/yellow]"
+            )
             self.backend = "hybrid"
         elif self.backend == "tavily" and "tavily" not in self.available_backends:
-            rprint("[yellow][Tool] `tavily` cannot be used, going to use `hybrid` mode[/yellow]")
+            rprint(
+                "[yellow][Tool] `tavily` cannot be used, going to use `hybrid` mode[/yellow]"
+            )
             self.backend = "hybrid"
         elif self.backend == "serpapi" and "serpapi" not in self.available_backends:
-            rprint("[yellow][Tool] `serpapi` cannot be used, going to use `hybrid` mode[/yellow]")
+            rprint(
+                "[yellow][Tool] `serpapi` cannot be used, going to use `hybrid` mode[/yellow]"
+            )
             self.backend = "hybrid"
 
         if self.backend == "hybrid":
-            rprint("[yellow][Tool] 🔧 Searching mode `hybrid` is set, available backends[/yellow]:" + ", ".join(self.available_backends))
-
+            rprint(
+                "[yellow][Tool] 🔧 Searching mode `hybrid` is set, available backends[/yellow]:"
+                + ", ".join(self.available_backends)
+            )
 
     def _structured_search(
         self,
@@ -241,17 +270,16 @@ class SearchTool(Tool):
         if not self.available_backends:
             # a: no api key configured
             error_message = "No usable searching engine, configure `TAVILY_API_KEY` or `SERPAPI_API_KEY` environment variable in `./.env`"
-            rprint("[bold red][Tool] ❌ Configuration Error: No search backends available[/bold red]")
+            rprint(
+                "[bold red][Tool] ❌ Configuration Error: No search backends available[/bold red]"
+            )
         else:
             # b: api searching all failed
             error_message = f"Searching failed, no response from all available backends: {'; '.join(notices)}"
             rprint("[bold red][Tool] ❌ Runtime Error: All backends failed[/bold red]")
 
         return _structured_payload(
-            results=[],
-            backend="hybrid",
-            answer=error_message,
-            notices=notices
+            results=[], backend="hybrid", answer=error_message, notices=notices
         )
 
     def _search_tavily(
@@ -301,7 +329,9 @@ class SearchTool(Tool):
         max_tokens: int,
     ) -> dict[str, Any]:
         if not self.serpapi_key:
-            raise RuntimeError("SERPAPI_API_KEY is not configured，cannot use serpapi search")
+            raise RuntimeError(
+                "SERPAPI_API_KEY is not configured，cannot use serpapi search"
+            )
 
         params = {
             "engine": "google",
