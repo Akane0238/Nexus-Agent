@@ -27,9 +27,9 @@ class SearchInput(BaseModel):
     mode: Optional[Literal["text", "structured", "json", "dict"]] = Field(
         default="text", description="返回模式：文本或结构化数据"
     )
-    fetch_full_page: bool = Field(default=False, description="是否获取完整页面内容")
-    max_results: int = Field(default=DEFAULT_MAX_RESULTS, description="最大搜索结果数")
-    max_tokens_per_source: int = Field(
+    fetch_full_page: Optional[bool] = Field(default=False, description="是否获取完整页面内容")
+    max_results: Optional[int] = Field(default=DEFAULT_MAX_RESULTS, description="最大搜索结果数")
+    max_tokens_per_source: Optional[int] = Field(
         default=2000, description="每个搜索结果的最大token数"
     )
 

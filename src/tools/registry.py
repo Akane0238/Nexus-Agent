@@ -179,7 +179,7 @@ class ToolRegistry:
                 properties = schema.get("properties", {})
 
                 if "=" not in params_str:
-                    if len(properties) == 1:
+                    if properties:
                         param_name = list(properties.keys())[0]
                         return True, {param_name: params_str}, None
                     return False, None, "Multiple parameters required but none provided"
