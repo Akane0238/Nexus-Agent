@@ -2,7 +2,7 @@ import ast
 import math
 import operator
 from typing import Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from src.tools.tool_base import Tool
 
@@ -10,7 +10,16 @@ from src.tools.tool_base import Tool
 class CalculatorInput(BaseModel):
     """Pydantic model for CalculatorTool parameters"""
 
+    model_config = ConfigDict(extra="ignore")
+
     expression: str = Field(description="数学表达式，如 2+3 或 sqrt(16)")
+
+    @field_validator("expression")
+    @classmethod
+    def validate_expression(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("expression cannot be empty")
+        return v
 
 
 class CalculatorTool(Tool):
@@ -18,8 +27,7 @@ class CalculatorTool(Tool):
 
     def __init__(self):
         super().__init__(
-            name="calculator",
-            description="数学计算工具，支持基本运算和数学函数"
+            name="calculator", description="数学计算工具，支持基本运算和数学函数"
         )
 
     def run(self, parameters: dict[str, Any]) -> str:
